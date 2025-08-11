@@ -11,11 +11,11 @@ int main()
 
     printf("Searching for device...\n");
 
-    char device_name[128];
-    u32 device_index = 0;
     const char *device_search = "Origin";
+    char device_name[128];
+    i32 device_index = -1;
 
-    while (true)
+    while (device_index < 0)
     {
         u32 port_count = rtmidi_get_port_count(midiin);
 

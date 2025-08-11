@@ -6,6 +6,7 @@ project(
 
 set(ROOT_DIR ${PROJECT_SOURCE_DIR})
 
+set(CMAKE_BUILD_TYPE Debug)
 set(CMAKE_CXX_STANDARD 20)
 
 
