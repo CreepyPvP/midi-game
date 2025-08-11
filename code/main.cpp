@@ -2,7 +2,7 @@
 #include <cstdlib>
 #include "rtmidi_c.h"
 
-#define WINDOWS
+#define UNIX
 #include "common.h"
 
 struct State
@@ -15,10 +15,14 @@ State state;
 const char *device_search = "Origin";
 
 u32 key_sequence[] = {
-    48,
-    49,
-    50,
-    51
+    57,				// A
+    59,				// B
+    60,				// C
+    62,				// D
+    57,				// A
+    64,				// E
+    65,				// F
+    67,				// G
 };
 
 int main()
@@ -83,6 +87,8 @@ int main()
             if (action == 0x9)
             {
                 u32 note_number = message[1];
+
+		printf("Pressed: %u\n", note_number);
                 
                 if (note_number == key_sequence[state.sequence_index])
                 {
