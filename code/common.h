@@ -34,3 +34,5 @@ void SleepMilliseconds(i32 milliseconds)
 #endif
 }
 
+
+#define lengthof(x) (sizeof(x) / sizeof(x[0]))
