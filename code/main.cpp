@@ -11,18 +11,41 @@ int main()
 
     printf("Searching for device...\n");
 
-    while (!rtmidi_get_port_count(midiin))
+    char device_name[128];
+    u32 device_index = 0;
+    const char *device_search = "Origin";
+
+    while (true)
     {
+        u32 port_count = rtmidi_get_port_count(midiin);
+
+        for (u32 i = 0; i < port_count; ++i)
+        {
+            i32 device_name_length = sizeof(device_name);
+            rtmidi_get_port_name(midiin, i, device_name, &device_name_length);
+
+            bool match = true;
+            for (u32 j = 0; device_search[j]; ++j)
+            {
+                if (j > device_name_length || device_search[j] != device_name[j])
+                {
+                    match = false;
+                    break;
+                }
+            }
+
+            if (match)
+            {
+                device_index = i;
+                break;
+            }
+        }
+
         SleepMilliseconds(100);
     }
 
-    char device_name[128];
-    i32 device_name_length = sizeof(device_name);
-    rtmidi_get_port_name(midiin, 0, device_name, &device_name_length);
-
     printf("Selected device: %s\n", device_name);
-
-    rtmidi_open_port(midiin, 0, device_name);
+    rtmidi_open_port(midiin, device_index, device_name);
 
     while (true)
     {
