@@ -1,6 +1,9 @@
 #include <stdio.h>
 #include <cstdlib>
+#include <string.h>
 #include "rtmidi_c.h"
+
+#include "miniaudio.h"
 
 #define UNIX
 #include "common.h"
@@ -25,8 +28,71 @@ u32 key_sequence[] = {
     67,				// G
 };
 
+const char *keyboard_sound_names[] = {
+    "assets/L_Tetris.mp3",		// C
+    NULL,				
+    "assets/N_SevenNationArmy.mp3",	// D
+    NULL,
+    "assets/M_Tetris.mp3",		// E
+    "assets/O_SevenNationArmy.mp3",	// F
+    NULL,
+    "assets/A_HWTH.wav",		// G
+    NULL,
+    "assets/D_HWTH.mp3",		// A
+    NULL,
+    "assets/C_HWTH.mp3",		// B
+    "assets/E_HWTH.mp3",		// C
+    NULL,
+    "assets/B_HWTH.mp3",		// D
+    NULL,
+    "assets/F_HWTH.mp3",		// E
+    "assets/G_HWTH.mp3",		// F
+    NULL,
+    "assets/H_AlleMeineEntchen.mp3",	// G
+    NULL,
+    "assets/I_AlleMeineEntchen.mp3",
+    NULL,
+    "assets/K_AlleMeineEntchen.mp3",
+    "assets/J_AlleMeineEntchen.mp3",
+};
+
 int main()
 {
+    //
+    // Audio
+    //
+
+    ma_engine audio;
+
+    if (ma_engine_init(NULL, &audio) != MA_SUCCESS)
+    {
+	printf("Failed to initialize miniaudio\n");
+	return -1;
+    }
+
+    ma_sound keyboard_sounds[lengthof(keyboard_sound_names)];
+    memset(keyboard_sounds, 0, sizeof(keyboard_sounds));
+
+    for (u32 i = 0; i < lengthof(keyboard_sounds); ++i)
+    {
+	if (keyboard_sound_names[i])
+	{
+	    // DECODE / No spacealization
+	    u32 flags = 0x00004002;
+	    ma_sound_init_from_file(&audio, keyboard_sound_names[i], flags, 
+			    	    NULL, NULL, keyboard_sounds + i);
+	}
+    }
+
+    ma_sound *current_sound = NULL;
+
+
+    ma_sound_start(keyboard_sounds);
+
+    //
+    // Midi input
+    //
+
     RtMidiInPtr midiin = rtmidi_in_create_default();
 
     printf("Searching for device...\n");
@@ -87,8 +153,21 @@ int main()
             if (action == 0x9)
             {
                 u32 note_number = message[1];
-
 		printf("Pressed: %u\n", note_number);
+
+		if (current_sound)
+		{
+		    ma_sound_stop(current_sound);
+		    current_sound = NULL;
+		}
+
+		u32 sound_id = note_number - 48;
+		if (sound_id < lengthof(keyboard_sounds) && keyboard_sound_names[sound_id])
+		{
+		    current_sound = keyboard_sounds + sound_id;
+		    ma_sound_seek_to_pcm_frame(current_sound, 0);
+		    ma_sound_start(current_sound);
+		}
                 
                 if (note_number == key_sequence[state.sequence_index])
                 {
