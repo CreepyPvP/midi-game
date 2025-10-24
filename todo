@@ -1,1 +1,7 @@
-on raspberry pi install jack using (jackd2)
+Dont use jack as backend, use alsa instead!
+
+ccmake . -B build
+
+Enable alsa. Use t to toggle advanced mode. Is alsa path set? If not install alsa dev using:
+
+sudo apt install libasound2-dev
