@@ -15,8 +15,6 @@ struct State
 
 State state;
 
-const char *device_search = "Origin";
-
 u32 key_sequence[] = {
     57,				// A
     59,				// B
@@ -56,8 +54,42 @@ const char *keyboard_sound_names[] = {
     "assets/J_AlleMeineEntchen.mp3",
 };
 
+void SelectMidiDevice(RtMidiInPtr &midiin)
+{
+    static bool connected = false;
+
+    if (connected)
+    {
+	return;
+    }
+
+    char device_name[128];
+    i32 device_index = -1;
+
+    u32 port_count = rtmidi_get_port_count(midiin);
+
+    for (u32 i = 0; i < port_count; ++i)
+    {
+	i32 device_name_length = sizeof(device_name);
+	rtmidi_get_port_name(midiin, i, device_name, &device_name_length);
+
+	printf("%s\n", device_name);
+
+	if (strcmp("QX49", device_name) <= 0)
+	{
+	    rtmidi_open_port(midiin, i, device_name);
+	    connected = true;
+	    return;
+	}
+    }
+
+    printf("Failed to find keyboard\n");
+}
+
 int main()
 {
+    InitializeModbus();
+
     //
     // Audio
     //
@@ -79,15 +111,20 @@ int main()
 	{
 	    // DECODE / No spacealization
 	    u32 flags = 0x00004002;
-	    ma_sound_init_from_file(&audio, keyboard_sound_names[i], flags, 
-			    	    NULL, NULL, keyboard_sounds + i);
+	    ma_sound_init_from_file(&audio, keyboard_sound_names[i], flags, NULL, NULL, keyboard_sounds + i);
 	}
     }
 
     ma_sound *current_sound = NULL;
 
-
-    ma_sound_start(keyboard_sounds);
+#if 0
+    // This plays continously in the background to stop the hdmi audio connection from resetting.
+    ma_sound keep_alive_sound;
+    ma_sound_init_from_file(&audio, "assets/A_HWTH.wav", 0x00004002, NULL, NULL, &keep_alive_sound);
+    ma_sound_set_volume(&keep_alive_sound, 0);
+    ma_sound_set_looping(&keep_alive_sound, true);
+    ma_sound_start(&keep_alive_sound);
+#endif
 
     //
     // Midi input
@@ -95,45 +132,24 @@ int main()
 
     RtMidiInPtr midiin = rtmidi_in_create_default();
 
-    printf("Searching for device...\n");
-
-    char device_name[128];
-    i32 device_index = -1;
-
-    while (device_index < 0)
-    {
-        u32 port_count = rtmidi_get_port_count(midiin);
-
-        for (u32 i = 0; i < port_count; ++i)
-        {
-            i32 device_name_length = sizeof(device_name);
-            rtmidi_get_port_name(midiin, i, device_name, &device_name_length);
-
-            bool match = true;
-            for (u32 j = 0; device_search[j]; ++j)
-            {
-                if (j > device_name_length || device_search[j] != device_name[j])
-                {
-                    match = false;
-                    break;
-                }
-            }
-
-            if (match)
-            {
-                device_index = i;
-                break;
-            }
-        }
-
-        SleepMilliseconds(100);
-    }
-
-    printf("Selected device: %s\n", device_name);
-    rtmidi_open_port(midiin, device_index, device_name);
-
     while (true)
     {
+	if (!ConnectToControl(506))
+	{
+            SleepMilliseconds(100);
+	    continue;
+	}
+
+	// control requested audio?
+
+	u16 registers[1];
+	ReadControlRegisters(0, 1, registers);
+	WriteControlRegister(0, 123);
+
+	// keyboard stuff...
+
+	SelectMidiDevice(midiin);
+
         u8 message[1024];
         u32 message_size = sizeof(message);
 

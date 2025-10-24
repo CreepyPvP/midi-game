@@ -1,1 +1,4 @@
 on raspberry pi install jack using (jackd2)
+
+
+alsamixer

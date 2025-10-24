@@ -17,6 +17,8 @@ add_executable(${PROJECT_NAME}
 
 # set_property(GLOBAL PROPERTY MSVC_RUNTIME_LIBRARY "MultiThreaded$<$<CONFIG:Debug>:Debug>")
 
+include_directories(./)
+
 add_subdirectory(rtmidi)
 target_link_libraries(${PROJECT_NAME} PUBLIC rtmidi)
 
