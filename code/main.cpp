@@ -134,6 +134,7 @@ int main()
 
     while (true)
     {
+#if 0
 	if (!ConnectToControl(506))
 	{
             SleepMilliseconds(100);
@@ -145,6 +146,7 @@ int main()
 	u16 registers[1];
 	ReadControlRegisters(0, 1, registers);
 	WriteControlRegister(0, 123);
+#endif
 
 	// keyboard stuff...
 

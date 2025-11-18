@@ -1,5 +1,6 @@
 [Unit]
 Description=Midi Service
+After=pulsaudio.service
 
 [Service]
 Type=simple
@@ -7,4 +8,4 @@ ExecStart=/home/escaperoom/midi-game/build/midi-game
 WorkingDirectory=/home/escaperoom/midi-game
 
 [Install]
-WantedBy=multi-user.target
+WantedBy=default.target
