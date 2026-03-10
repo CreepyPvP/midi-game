@@ -153,7 +153,7 @@ int main()
 	SelectMidiDevice(midiin);
 
         u8 message[1024];
-        u32 message_size = sizeof(message);
+        u64 message_size = sizeof(message);
 
         f64 stamp = rtmidi_in_get_message(midiin, message, (size_t *) &message_size);
 
