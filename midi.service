@@ -8,4 +8,4 @@ ExecStart=/home/escaperoom/midi-game/build/midi-game
 WorkingDirectory=/home/escaperoom/midi-game
 
 [Install]
-WantedBy=default.target
+WantedBy=multi-user.target

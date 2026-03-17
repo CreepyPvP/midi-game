@@ -88,6 +88,9 @@ void SelectMidiDevice(RtMidiInPtr &midiin)
 
 int main()
 {
+    sleep(30);
+    printf("hello world\n");
+
     InitializeModbus();
 
     //
