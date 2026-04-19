@@ -5,7 +5,7 @@
 
 #include "miniaudio.h"
 
-#define UNIX
+#define WINDOWS
 #include "common.h"
 
 struct State
@@ -26,32 +26,14 @@ u32 key_sequence[] = {
     67,				// G
 };
 
-const char *keyboard_sound_names[] = {
-    "assets/L_Tetris.mp3",		// C
-    NULL,				
-    "assets/N_SevenNationArmy.mp3",	// D
-    NULL,
-    "assets/M_Tetris.mp3",		// E
-    "assets/O_SevenNationArmy.mp3",	// F
-    NULL,
-    "assets/A_HWTH.wav",		// G
-    NULL,
-    "assets/D_HWTH.mp3",		// A
-    NULL,
-    "assets/C_HWTH.mp3",		// B
-    "assets/E_HWTH.mp3",		// C
-    NULL,
-    "assets/B_HWTH.mp3",		// D
-    NULL,
-    "assets/F_HWTH.mp3",		// E
-    "assets/G_HWTH.mp3",		// F
-    NULL,
-    "assets/H_AlleMeineEntchen.mp3",	// G
-    NULL,
-    "assets/I_AlleMeineEntchen.mp3",
-    NULL,
-    "assets/K_AlleMeineEntchen.mp3",
-    "assets/J_AlleMeineEntchen.mp3",
+u32 octave_offsets[] = {
+    2,                  // c to d
+    2,                  // d to e
+    1,                  // e
+    2,                  // f
+    2,                  // g
+    2,                  // a
+    1,                  // h
 };
 
 void SelectMidiDevice(RtMidiInPtr &midiin)
@@ -60,7 +42,7 @@ void SelectMidiDevice(RtMidiInPtr &midiin)
 
     if (connected)
     {
-	return;
+        return;
     }
 
     char device_name[128];
@@ -70,17 +52,17 @@ void SelectMidiDevice(RtMidiInPtr &midiin)
 
     for (u32 i = 0; i < port_count; ++i)
     {
-	i32 device_name_length = sizeof(device_name);
-	rtmidi_get_port_name(midiin, i, device_name, &device_name_length);
+        i32 device_name_length = sizeof(device_name);
+        rtmidi_get_port_name(midiin, i, device_name, &device_name_length);
 
-	printf("%s\n", device_name);
+        printf("%s\n", device_name);
 
-	if (strcmp("QX49", device_name) <= 0)
-	{
-	    rtmidi_open_port(midiin, i, device_name);
-	    connected = true;
-	    return;
-	}
+        if (strcmp("QX49", device_name) <= 0)
+        {
+            rtmidi_open_port(midiin, i, device_name);
+            connected = true;
+            return;
+        }
     }
 
     printf("Failed to find keyboard\n");
@@ -88,7 +70,7 @@ void SelectMidiDevice(RtMidiInPtr &midiin)
 
 int main()
 {
-    sleep(30);
+    SleepMilliseconds(3000);
     printf("hello world\n");
 
     InitializeModbus();
@@ -101,21 +83,26 @@ int main()
 
     if (ma_engine_init(NULL, &audio) != MA_SUCCESS)
     {
-	printf("Failed to initialize miniaudio\n");
-	return -1;
+        printf("Failed to initialize miniaudio\n");
+        return -1;
     }
 
-    ma_sound keyboard_sounds[lengthof(keyboard_sound_names)];
+    ma_sound keyboard_sounds[29];
     memset(keyboard_sounds, 0, sizeof(keyboard_sounds));
-
     for (u32 i = 0; i < lengthof(keyboard_sounds); ++i)
     {
-	if (keyboard_sound_names[i])
-	{
-	    // DECODE / No spacealization
-	    u32 flags = 0x00004002;
-	    ma_sound_init_from_file(&audio, keyboard_sound_names[i], flags, NULL, NULL, keyboard_sounds + i);
-	}
+        const char *fmt = "/home/escaperoom/sounds/t%u.wav"; 
+
+        if (i < 10)
+        {
+            fmt = "/home/escaperoom/sounds/t0%u.wav";
+        }
+
+        char buffer[128] = {};
+        sprintf(buffer, fmt, i);
+
+        u32 flags = 0x00004002;
+        ma_sound_init_from_file(&audio, buffer, flags, NULL, NULL, keyboard_sounds + i);
     }
 
     ma_sound *current_sound = NULL;
@@ -138,22 +125,22 @@ int main()
     while (true)
     {
 #if 0
-	if (!ConnectToControl(506))
-	{
+        if (!ConnectToControl(506))
+        {
             SleepMilliseconds(100);
-	    continue;
-	}
+            continue;
+        }
 
-	// control requested audio?
+        // control requested audio?
 
-	u16 registers[1];
-	ReadControlRegisters(0, 1, registers);
-	WriteControlRegister(0, 123);
+        u16 registers[1];
+        ReadControlRegisters(0, 1, registers);
+        WriteControlRegister(0, 123);
 #endif
 
-	// keyboard stuff...
+        // keyboard stuff...
 
-	SelectMidiDevice(midiin);
+        SelectMidiDevice(midiin);
 
         u8 message[1024];
         u64 message_size = sizeof(message);
@@ -174,22 +161,30 @@ int main()
             if (action == 0x9)
             {
                 u32 note_number = message[1];
-		printf("Pressed: %u\n", note_number);
+                printf("Pressed: %u\n", note_number);
 
-		if (current_sound)
-		{
-		    ma_sound_stop(current_sound);
-		    current_sound = NULL;
-		}
+                if (current_sound)
+                {
+                    ma_sound_stop(current_sound);
+                    current_sound = NULL;
+                }
 
-		u32 sound_id = note_number - 48;
-		if (sound_id < lengthof(keyboard_sounds) && keyboard_sound_names[sound_id])
-		{
-		    current_sound = keyboard_sounds + sound_id;
-		    ma_sound_seek_to_pcm_frame(current_sound, 0);
-		    ma_sound_start(current_sound);
-		}
-                
+                u32 base_c = 48;
+                u32 current_note = base_c;
+                for (u32 i = 0; i < 29; ++i)
+                {
+                    if (current_note == note_number)
+                    {
+                        // we have to play sound i
+                        current_sound = keyboard_sounds + i;
+                        ma_sound_seek_to_pcm_frame(current_sound, 0);
+                        ma_sound_start(current_sound);
+                        break;
+                    }
+
+                    current_note += octave_offsets[i % lengthof(octave_offsets)];
+                }
+
                 if (note_number == key_sequence[state.sequence_index])
                 {
                     if (++state.sequence_index >= lengthof(key_sequence))
