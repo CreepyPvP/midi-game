@@ -5,7 +5,7 @@
 
 #include "miniaudio.h"
 
-#define WINDOWS
+#define UNIX
 #include "common.h"
 
 struct State
@@ -91,15 +91,16 @@ int main()
     memset(keyboard_sounds, 0, sizeof(keyboard_sounds));
     for (u32 i = 0; i < lengthof(keyboard_sounds); ++i)
     {
+	u32 id = i + 1;
         const char *fmt = "/home/escaperoom/sounds/t%u.wav"; 
 
-        if (i < 10)
+        if (id < 10)
         {
             fmt = "/home/escaperoom/sounds/t0%u.wav";
         }
 
         char buffer[128] = {};
-        sprintf(buffer, fmt, i);
+        sprintf(buffer, fmt, id);
 
         u32 flags = 0x00004002;
         ma_sound_init_from_file(&audio, buffer, flags, NULL, NULL, keyboard_sounds + i);
@@ -169,8 +170,7 @@ int main()
                     current_sound = NULL;
                 }
 
-                u32 base_c = 48;
-                u32 current_note = base_c;
+                u32 current_note = 36;
                 for (u32 i = 0; i < 29; ++i)
                 {
                     if (current_note == note_number)
@@ -179,6 +179,7 @@ int main()
                         current_sound = keyboard_sounds + i;
                         ma_sound_seek_to_pcm_frame(current_sound, 0);
                         ma_sound_start(current_sound);
+			printf("Playing note: %u\n", current_note);
                         break;
                     }
 
