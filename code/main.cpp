@@ -8,22 +8,53 @@
 #define UNIX
 #include "common.h"
 
+struct Timer
+{
+    bool active;
+    f32 time_left;
+};
+
+void TimerStart(Timer *timer, f32 time)
+{
+    timer->active = true;
+    timer->time_left = time;
+}
+
+bool TimerUpdate(Timer *timer, f32 delta)
+{
+    if (!timer->active)
+    {
+	return false;
+    }
+
+    timer->time_left -= delta;
+
+    if (timer->time_left <= 0)
+    {
+	*timer = {};
+	retrurn true;
+    }
+
+    return false;
+}
+
 struct State
 {
     u32 sequence_index;
+    Timer reset_timer;
 };
 
 State state;
 
 u32 key_sequence[] = {
-    57,				// A
-    59,				// B
-    60,				// C
-    62,				// D
-    57,				// A
-    64,				// E
-    65,				// F
-    67,				// G
+    53,		// 11
+    64,
+    64,
+    67,
+    53,
+    50,		// 9
+    55,		// 12
+    48		// 8
 };
 
 u32 octave_offsets[] = {
@@ -139,6 +170,11 @@ int main()
         WriteControlRegister(0, 123);
 #endif
 
+	if (TimerUpdate(&state.reset_timer, 0.016))
+	{
+	    state.sequence_index = 0;
+	}
+
         // keyboard stuff...
 
         SelectMidiDevice(midiin);
@@ -193,9 +229,12 @@ int main()
                         printf("Sequence completed\n");
                         state.sequence_index = 0;
                     }
+
+		    TimerStart(&state.reset_timer, 10);
                 }
                 else
                 {
+		    state.reset_timer = {};
                     state.sequence_index = 0;
                 }
             }
