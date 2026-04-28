@@ -32,7 +32,7 @@ bool TimerUpdate(Timer *timer, f32 delta)
     if (timer->time_left <= 0)
     {
 	*timer = {};
-	retrurn true;
+	return true;
     }
 
     return false;
@@ -42,6 +42,10 @@ struct State
 {
     u32 sequence_index;
     Timer reset_timer;
+
+    Timer correct_timer;
+    Timer wrong_timer;
+    Timer win_timer;
 };
 
 State state;
@@ -49,7 +53,7 @@ State state;
 u32 key_sequence[] = {
     53,		// 11
     64,
-    64,
+    62,
     67,
     53,
     50,		// 9
@@ -70,6 +74,16 @@ u32 octave_offsets[] = {
 void SelectMidiDevice(RtMidiInPtr &midiin)
 {
     static bool connected = false;
+    static u32 last_port_count = 0;
+
+    // do we need a reconnect? We check if the number of the devices changed
+    if (rtmidi_get_port_count(midiin) != last_port_count)
+    {
+	if (connected)
+	    rtmidi_close_port(midiin);
+	connected = false;
+	last_port_count = rtmidi_get_port_count(midiin);
+    }
 
     if (connected)
     {
@@ -79,9 +93,7 @@ void SelectMidiDevice(RtMidiInPtr &midiin)
     char device_name[128];
     i32 device_index = -1;
 
-    u32 port_count = rtmidi_get_port_count(midiin);
-
-    for (u32 i = 0; i < port_count; ++i)
+    for (u32 i = 0; i < last_port_count; ++i)
     {
         i32 device_name_length = sizeof(device_name);
         rtmidi_get_port_name(midiin, i, device_name, &device_name_length);
@@ -156,24 +168,45 @@ int main()
 
     while (true)
     {
-#if 0
         if (!ConnectToControl(506))
         {
             SleepMilliseconds(100);
             continue;
         }
 
-        // control requested audio?
+	bool active = false;
 
-        u16 registers[1];
-        ReadControlRegisters(0, 1, registers);
-        WriteControlRegister(0, 123);
-#endif
-
-	if (TimerUpdate(&state.reset_timer, 0.016))
 	{
-	    state.sequence_index = 0;
+	    u16 output = 0;
+	    output |= (state.correct_timer.active << 0);
+	    output |= (state.wrong_timer.active << 1);
+	    output |= (state.win_timer.active << 2);
+	    WriteControlRegister(2, output);
+
+	    u16 registers[1];
+	    ReadControlRegisters(2, 1, registers);
+
+	    // reset
+	    if (registers[0] & (1 << 9))
+	    {
+		state = {};
+	    }
+
+	    active = registers[0] & (1 << 8);
 	}
+
+	f32 delta = 0.016;
+
+	if (TimerUpdate(&state.reset_timer, delta))
+	{
+	    TimerStart(&state.wrong_timer, 0.10);
+	    state.sequence_index = 0;
+	    printf("Sequence timeout\n");
+	}
+
+	TimerUpdate(&state.wrong_timer, delta);
+	TimerUpdate(&state.correct_timer, delta);
+	TimerUpdate(&state.win_timer, delta);
 
         // keyboard stuff...
 
@@ -185,7 +218,7 @@ int main()
         f64 stamp = rtmidi_in_get_message(midiin, message, (size_t *) &message_size);
 
         // https://www.songstuff.com/recording/article/midi-message-format/
-        if (message_size)
+        if (message_size && active)
         {
             u32 action = (message[0] & 0xF0) >> 4;
 
@@ -197,43 +230,54 @@ int main()
 
             if (action == 0x9)
             {
-                u32 note_number = message[1];
-                printf("Pressed: %u\n", note_number);
-
-                if (current_sound)
-                {
-                    ma_sound_stop(current_sound);
-                    current_sound = NULL;
-                }
+                u32 midi_note = message[1];
 
                 u32 current_note = 36;
+		i32 note_id = -1;
                 for (u32 i = 0; i < 29; ++i)
                 {
-                    if (current_note == note_number)
+                    if (current_note == midi_note)
                     {
                         // we have to play sound i
-                        current_sound = keyboard_sounds + i;
-                        ma_sound_seek_to_pcm_frame(current_sound, 0);
-                        ma_sound_start(current_sound);
-			printf("Playing note: %u\n", current_note);
+			note_id = i;
                         break;
                     }
 
                     current_note += octave_offsets[i % lengthof(octave_offsets)];
                 }
 
-                if (note_number == key_sequence[state.sequence_index])
+		// ignore black keys
+		if (note_id < 0)
+		    continue;
+
+		// stop current sound
+                if (current_sound)
                 {
+                    ma_sound_stop(current_sound);
+                    current_sound = NULL;
+                }
+
+		// start new sound
+		current_sound = keyboard_sounds + note_id;
+		ma_sound_seek_to_pcm_frame(current_sound, 0);
+		ma_sound_start(current_sound);
+
+                if (midi_note == key_sequence[state.sequence_index])
+                {
+		    TimerStart(&state.reset_timer, 10);
+		    TimerStart(&state.correct_timer, 0.10);
+
                     if (++state.sequence_index >= lengthof(key_sequence))
                     {
                         printf("Sequence completed\n");
                         state.sequence_index = 0;
+			state.reset_timer = {};
+			TimerStart(&state.win_timer, 0.10);
                     }
-
-		    TimerStart(&state.reset_timer, 10);
                 }
                 else
                 {
+		    TimerStart(&state.wrong_timer, 0.10);
 		    state.reset_timer = {};
                     state.sequence_index = 0;
                 }
